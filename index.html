@@ -227,7 +227,7 @@ tr.best td{color:var(--act);font-weight:700}
 .mapph .note{max-width:560px;text-align:left}
 .hi{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--ln);padding:16px 0;flex-wrap:wrap}
 .hi small{color:var(--mu)}
-.hi .btn{margin:4px 8px 4px 0;min-height:40px;padding:0 16px;font-size:14px}
+.hi .btn{margin:4px 8px 4px 0;min-height:44px;padding:0 16px;font-size:14px}
 .abtn{min-height:34px!important;padding:0 12px!important;font-size:12px!important;margin:2px 4px 2px 0!important}
 #admin td:last-child{white-space:normal;min-width:280px}
 .greet{font-size:20px;margin:0 0 18px}
@@ -419,7 +419,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 <label>Finition<input id="f_fin" value="M Sport"></label>
 <label>Localisation<input id="f_loc" value="Marseille"></label>
 </div>
-<label class="chk"><input type="checkbox" id="demo" checked> <span>Mode démonstration (données fictives, clairement signalées)</span></label>
+<label class="chk"><input type="checkbox" id="demo"> <span>Mode démonstration (données fictives, clairement signalées)</span></label>
 <button class="btn" onclick="estimate()">Estimer le prix</button></div>
 <div id="res"></div>
 </section>
@@ -473,7 +473,12 @@ go('home');$('exg').innerHTML=gauge(18000,24000,null,[[21300,'Médiane'],[19900,
 
 /* ---- Couche de données : à remplacer par les sources de données via un serveur (la clé API ne doit jamais être dans la page) ---- */
 async function getComparables(c,demo){
-  if(!demo)return [];
+  if(!demo){
+    /* Données réelles : base d'annonces du serveur (leboncoin, La Centrale, AutoScout24…), via api.php.
+       Une future API de fournisseur se branche côté serveur (api.php, action "comps") : la clé n'est jamais dans la page. */
+    const r=await api('comps',c);
+    return (r.items||[]).map(x=>({prix:+x.prix,source:x.source,annee:+x.annee,km:+x.km,pays:x.pays||'France',ville:x.ville||'',url:x.url||'',relaxed:!!r.relaxed}));
+  }
   const base=41000*Math.pow(.88,new Date().getFullYear()-c.annee)-(c.km-60000)*.06;
   let s=7;const r=()=>(s=(s*9301+49297)%233280)/233280;
   return Array.from({length:60+Math.floor(r()*60)},()=>({prix:Math.max(2000,base*(0.9+r()*.2)),demo:true}));
@@ -521,12 +526,16 @@ function euTable(rows,refName,bestName){return `<div class="wrap" style="margin-
 let CLI_PAYS='France',CLI_VILLE='';
 function cliSelect(){return ['France','Allemagne','Belgique','Espagne','Italie','Pays-Bas'].map(p=>`<option value="${p}"${CLI_PAYS===p?' selected':''}>${p}</option>`).join('')+`<option value="Autre"${CLI_PAYS==='Autre'?' selected':''}>Autre pays d'Europe</option>`}
 function updateTransport(){CLI_PAYS=$('cli_pays').value;CLI_VILLE=$('cli_ville').value;renderEuBox()}
+function realEuRows(comps){const g={};comps.forEach(x=>{(g[x.pays]=g[x.pays]||[]).push(x.prix)});
+  return Object.keys(g).filter(k=>g[k].length>=3).map(k=>({name:k,ref:k==='France',prix:q(g[k],.5),n:g[k].length}))}
 function euCompute(x,toC){const rows=x.euRows.map(r=>({...r,transport:transportCost(r.name,toC),total:null}));rows.forEach(r=>r.total=r.transport==null?null:r.prix+r.transport);
   const known=rows.filter(r=>r.total!=null);const refRow=known.find(r=>r.name===toC)||rows.find(r=>r.ref);
   return{rows,known,refRow}}
 function renderEuBox(){const x=LAST_EST;if(!x||!$('euBox'))return;const toC=CLI_PAYS;
-  const{rows,known,refRow}=euCompute(x,toC);let body;x.euResult=null;
-  if(!known.length){body='<div class="note">Données insuffisantes pour estimer le transport vers ce pays.</div>'+euTable(rows,null,null)}
+  x.euResult=null;x.transportTo=toC;x.transportVille=CLI_VILLE;x.euRowsFull=[];
+  if(x.euRows.length<2){$('euBox').innerHTML='<div class="note">Données insuffisantes pour comparer les pays : il faut au moins 3 annonces réelles dans au moins deux pays.</div>';return}
+  const{rows,known,refRow}=euCompute(x,toC);let body;
+  if(!known.length||!refRow){body='<div class="note">Données insuffisantes pour estimer le transport vers ce pays.</div>'+euTable(rows,null,null)}
   else{const best=known.reduce((a,b)=>b.total<a.total?b:a);const marge=refRow.total-best.total,pct=marge/refRow.total*100;const euR=rating(best.total,refRow.total);
     x.euResult={best,refRow,marge,pct,euR};
     body=`<div class="stats"><div class="stat"><span class="lab">Deal Rating</span><b>${euR.g}</b></div><div class="stat"><span class="lab">Marché le moins cher</span><b>${best.name}</b></div><div class="stat"><span class="lab">Marge d'achat possible par rapport à la référence locale</span><b>${eur(marge)}</b></div></div>
@@ -537,12 +546,18 @@ function renderEuBox(){const x=LAST_EST;if(!x||!$('euBox'))return;const toC=CLI_
 }
 const PRINT_ICO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>';
 async function estimate(){
-  const c={annee:+$('f_annee').value,km:+$('f_km').value};
+  const c={marque:$('f_marque').value,modele:$('f_modele').value,finition:$('f_fin').value,annee:+$('f_annee').value,km:+$('f_km').value,carburant:$('f_carb').value,boite:$('f_bv').value};
+  $('res').innerHTML='<p class="mu">…</p>';
   const comps=await getComparables(c,$('demo').checked);
-  if(!comps.length){$('res').innerHTML='<div class="note">Données insuffisantes : aucune source de comparables n\'est connectée. Activez le mode démonstration.</div>';return}
+  if(comps.length<3){$('res').innerHTML=`<div class="note"><b>Données insuffisantes.</b> <span>Nous n'avons pas trouvé assez d'annonces réelles comparables pour ce véhicule (minimum 3).</span> <span>Aucun prix n'est inventé.</span></div><p class="mu" style="font-size:14px">Annonces comparables trouvées : ${comps.length}</p>`;return}
   const p=comps.map(x=>x.prix),med=q(p,.5),n=p.length,conf=Math.min(95,Math.round(35+n*.5));
   const t=`${$('f_marque').value} ${$('f_modele').value}`;
-  const euRows_=euRows(med,c.annee*7+c.km);
+  const demo=!!comps[0].demo,euRows_=demo?euRows(med,c.annee*7+c.km):realEuRows(comps);
+  const bySrc={};comps.forEach(x=>{if(x.source)bySrc[x.source]=(bySrc[x.source]||0)+1});
+  const calc=demo?`<p class="mu">Cette estimation est basée sur ${n} véhicules comparables présents sur le marché (médiane). Facteurs pris en compte : année, kilométrage, motorisation, boîte, finition, localisation. C'est une analyse basée sur les données disponibles, pas une vérité absolue.</p>`
+    :`<p class="mu">${comps[0].relaxed?`Cette estimation est la médiane des prix de ${n} annonces réelles comparables : même marque et même modèle, kilométrage proche, même carburant, année ±2 ans (boîte non filtrée, faute d'annonces suffisantes).`:`Cette estimation est la médiane des prix de ${n} annonces réelles comparables : même marque et même modèle, kilométrage proche, même carburant, année ±1 an et même boîte.`}</p><p class="mu">C'est une analyse basée sur les données disponibles, pas une vérité absolue.</p>`;
+  const srcCard=demo?'':`<div class="card" style="margin-top:16px"><h3>Sources des annonces</h3><div class="stats">${Object.keys(bySrc).map(k=>`<div class="stat"><span class="lab">${esc(k)}</span><b>${bySrc[k]}</b></div>`).join('')}</div>
+  <div class="wrap"><table><thead><tr><th>Source</th><th>Année</th><th>Kilométrage</th><th>Pays</th><th>Prix</th><th>Annonce</th></tr></thead><tbody>${comps.slice(0,100).map(x=>`<tr><td>${esc(x.source)}</td><td>${x.annee}</td><td>${x.km.toLocaleString(LOCS[L])} km</td><td>${esc(x.pays)}</td><td>${eur(x.prix)}</td><td>${/^https?:\/\//i.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener nofollow">Voir</a>`:'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   $('res').innerHTML=`${comps[0].demo?'<div class="note">DONNÉES FICTIVES DE DÉMONSTRATION — ne pas utiliser pour une décision réelle.</div>':''}
   <div class="kpi" style="margin-top:16px"><div class="card kmain"><div><span class="lab">PRIX DE MARCHÉ ESTIMÉ</span><div class="big">${eur(med)}</div><div class="mu" data-nt>${esc(t)} · ${c.annee} · ${c.km.toLocaleString(LOCS[L])} km</div></div>
   <div><span class="lab">NIVEAU DE CONFIANCE</span><div class="bar"><i style="width:${conf}%"></i></div><b>${conf} %</b></div></div>
@@ -551,13 +566,13 @@ async function estimate(){
   <div class="card"><span class="lab">POSITIONNEMENT PREMIUM</span><b>${eur(med*1.046)}</b></div>
   <div class="card"><span class="lab">COMPARABLES</span><b>${n} véhicules comparables analysés</b></div></div>
   <div class="card" style="margin-top:16px"><h3>Position dans le marché</h3>${gauge(q(p,.02),q(p,.98),[q(p,.25),q(p,.75)],[[med,'Médiane']])}<span class="mu" style="font-size:14px">Zone colorée : fourchette de marché (25 % — 75 % des comparables).</span></div>${n<30?'<div class="note">Estimation indicative : nombre de véhicules comparables limité.</div>':''}
-  <div class="card" style="margin-top:16px"><h3>Comment ce prix est-il calculé ?</h3><p class="mu">Cette estimation est basée sur ${n} véhicules comparables présents sur le marché (médiane). Facteurs pris en compte : année, kilométrage, motorisation, boîte, finition, localisation. C'est une analyse basée sur les données disponibles, pas une vérité absolue.</p></div>
+  <div class="card" style="margin-top:16px"><h3>Comment ce prix est-il calculé ?</h3>${calc}</div>${srcCard}
   <div class="card" style="margin-top:16px"><h3>Positionnement Europe &amp; marge d'achat possible</h3>
   <div class="fgrid4" style="margin-top:14px"><label>Votre ville (facultatif)<input id="cli_ville" value="${esc(CLI_VILLE)}" placeholder="Marseille" oninput="clearTimeout(window._ct);window._ct=setTimeout(updateTransport,400)"></label>
   <label>Votre pays<select id="cli_pays" onchange="updateTransport()">${cliSelect()}</select></label></div>
   <div id="euBox" style="margin-top:14px"></div></div>
   <p style="margin-top:16px"><button class="btn alt" onclick="exportFiche('estimate')">${PRINT_ICO}<span>Exporter la fiche</span></button></p>`;
-  LAST_EST={t,annee:c.annee,km:c.km,med,lo:q(p,.25),hi:q(p,.75),quick:med*.972,premium:med*1.046,n,conf,demo:!!comps[0].demo,euRows:euRows_,f:formVals()};
+  LAST_EST={t,annee:c.annee,km:c.km,med,lo:q(p,.25),hi:q(p,.75),quick:med*.972,premium:med*1.046,n,conf,demo,euRows:euRows_,f:formVals()};
   renderEuBox();
   rec('estimate',`${t} ${c.annee} — ${eur(med)}${comps[0].demo?' (démo)':''}`,{f:formVals()});
 }
@@ -603,7 +618,7 @@ function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.s
 function toggleTheme(){setTheme(curTheme()==='light'?'dark':'light')}
 paintTheme();
 let U=null,MODE='server',SERVER_OK=false,HIST=[],REPLAY=false,AM='login';
-const ERR={e_mail:'Adresse e-mail invalide.',e_pw:'Mot de passe : 8 caractères minimum.',e_dup:'Un compte existe déjà avec cet e-mail.',e_bad:'E-mail ou mot de passe incorrect.',e_auth:'Session expirée, reconnectez-vous.',srv:'Une erreur est survenue, réessayez.',e_susp:'Ce compte est suspendu.',e_self:'Action impossible sur votre propre compte.'};
+const ERR={e_mail:'Adresse e-mail invalide.',e_pw:'Mot de passe : 8 caractères minimum.',e_dup:'Un compte existe déjà avec cet e-mail.',e_bad:'E-mail ou mot de passe incorrect.',e_auth:'Session expirée, reconnectez-vous.',srv:'Une erreur est survenue, réessayez.',e_susp:'Ce compte est suspendu.',e_self:'Action impossible sur votre propre compte.',e_comp:'Annonce refusée : vérifiez la source, la marque, le modèle, l\'année, le kilométrage et le prix.',e_srvonly:'Cette fonction nécessite le serveur (api.php sur Hostinger).'};
 const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const FIELDS=['f_marque','f_modele','f_annee','f_km','f_carb','f_bv','f_fin','f_loc','demo'];
 const formVals=()=>Object.fromEntries(FIELDS.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value]));
@@ -612,7 +627,7 @@ const lu=(e,u)=>({name:u.name,email:e,role:e==='admin@iekars.demo'||u.role==='ad
 async function sha(x){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(x));return[...new Uint8Array(b)].map(v=>v.toString(16).padStart(2,'0')).join('')}
 /* Serveur (api.php sur Hostinger) ; sinon mode démonstration local */
 async function api(a,d={}){try{const r=await fetch('api.php?a='+a,{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'iekars'},body:JSON.stringify(d),credentials:'same-origin'});const j=JSON.parse(await r.text());SERVER_OK=true;MODE='server';return j}catch(e){if(SERVER_OK)return{error:'srv'};return localApi(a,d)}}
-async function localApi(a,d){MODE='local';const us=ls.get('iek_u')||{},em=(d.email||'').trim().toLowerCase(),cur=ls.get('iek_s');
+async function localApi(a,d){MODE='local';if(a==='comps')return{items:[]};if(a.startsWith('admin_comp'))return{error:'e_srvonly'};const us=ls.get('iek_u')||{},em=(d.email||'').trim().toLowerCase(),cur=ls.get('iek_s');
  if(a==='me')return{user:cur&&us[cur]&&us[cur].status!=='suspended'?lu(cur,us[cur]):null};
  if(a==='register'){if(!/^\S+@\S+\.\S+$/.test(em))return{error:'e_mail'};if((d.password||'').length<8)return{error:'e_pw'};if(us[em])return{error:'e_dup'};const salt=Math.random().toString(36).slice(2);us[em]={name:(d.name||'').trim().slice(0,60)||em.split('@')[0],salt,hash:await sha(salt+d.password),created:new Date().toISOString(),last:new Date().toISOString()};ls.set('iek_u',us);ls.set('iek_s',em);return{user:lu(em,us[em])}}
  if(a==='login'){const u=us[em];if(!u||u.hash!==await sha(u.salt+(d.password||'')))return{error:'e_bad'};if(u.status==='suspended')return{error:'e_susp'};u.last=new Date().toISOString();ls.set('iek_u',us);ls.set('iek_s',em);return{user:lu(em,u)}}
@@ -633,10 +648,40 @@ async function localAdmin(a,d,us,cur){if(lu(cur,us[cur]).role!=='admin')return{e
  else if(a==='admin_pw'){const pw=Math.random().toString(36).slice(2,12),salt=Math.random().toString(36).slice(2);us[t].salt=salt;us[t].hash=await sha(salt+pw);ls.set('iek_u',us);return{password:pw}}
  ls.set('iek_u',us);return{ok:1}}
 const fd=x=>x?new Date(x).toLocaleDateString(LOCS[L]):'—';
-function renderAdmin(){$('admBody').innerHTML=`<div id="admStats" class="stats" style="margin-top:0"></div><div class="card" style="margin-top:16px"><label>Rechercher un utilisateur (nom ou e-mail)<input id="adm_q" type="search" oninput="clearTimeout(window._aq);window._aq=setTimeout(loadUsers,250)"></label><div class="wrap" style="margin-top:16px"><table><thead><tr><th>Nom</th><th>E-mail</th><th>Rôle</th><th>Statut</th><th>Inscrit le</th><th>Dernière connexion</th><th>Recherches</th><th>Actions</th></tr></thead><tbody id="admRows"></tbody></table></div></div>`;loadUsers()}
+function renderAdmin(){$('admBody').innerHTML=`<div id="admStats" class="stats" style="margin-top:0"></div><div class="card" style="margin-top:16px"><label>Rechercher un utilisateur (nom ou e-mail)<input id="adm_q" type="search" oninput="clearTimeout(window._aq);window._aq=setTimeout(loadUsers,250)"></label><div class="wrap" style="margin-top:16px"><table><thead><tr><th>Nom</th><th>E-mail</th><th>Rôle</th><th>Statut</th><th>Inscrit le</th><th>Dernière connexion</th><th>Recherches</th><th>Actions</th></tr></thead><tbody id="admRows"></tbody></table></div></div>
+ <div class="card" style="margin-top:16px"><div class="eyebrow">Estimation</div><h3>Base d'annonces comparables</h3>
+ <p class="mu">Ajoutez ici les annonces réelles relevées sur leboncoin, La Centrale ou AutoScout24. L'estimation utilise uniquement ces annonces : aucun prix n'est inventé.</p>
+ <div id="compBy" class="stats"></div>
+ <h4>Ajouter une annonce</h4>
+ <div class="fgrid4"><label>Source<select id="cp_source"><option value="leboncoin">leboncoin</option><option value="La Centrale">La Centrale</option><option value="AutoScout24">AutoScout24</option><option value="Autre">Autre</option></select></label>
+ <label>Marque<input id="cp_marque" placeholder="BMW"></label><label>Modèle<input id="cp_modele" placeholder="Série 3 320d"></label><label>Finition<input id="cp_finition" placeholder="M Sport"></label>
+ <label>Année<input id="cp_annee" type="number" inputmode="numeric" placeholder="2020"></label><label>Kilométrage<input id="cp_km" type="number" inputmode="numeric" placeholder="82000"></label>
+ <label>Carburant<select id="cp_carburant"><option value="Diesel">Diesel</option><option value="Essence">Essence</option><option value="Hybride">Hybride</option><option value="Électrique">Électrique</option></select></label>
+ <label>Boîte<select id="cp_boite"><option value="Automatique">Automatique</option><option value="Manuelle">Manuelle</option></select></label>
+ <label>Prix (€)<input id="cp_prix" type="number" inputmode="numeric" placeholder="19900"></label><label>Pays<select id="cp_pays">${['France','Allemagne','Belgique','Espagne','Italie','Pays-Bas'].map(p=>`<option value="${p}">${p}</option>`).join('')}</select></label>
+ <label>Ville<input id="cp_ville" placeholder="Marseille"></label><label>Lien de l'annonce<input id="cp_url" placeholder="https://..."></label></div>
+ <button class="btn" style="margin-top:16px" onclick="addComp()">Ajouter l'annonce</button><p id="cpMsg" class="mu" style="font-size:14px"></p>
+ <h4>Importer un tableau (Excel / CSV)</h4>
+ <p class="mu" style="font-size:14px">Une annonce par ligne, colonnes séparées par des points-virgules, dans cet ordre :</p>
+ <p style="font-size:13px" data-nt><code>source;marque;modele;finition;annee;km;carburant;boite;prix;pays;ville;lien</code></p>
+ <textarea id="cp_csv" rows="5" placeholder="leboncoin;BMW;Série 3 320d;M Sport;2020;82000;Diesel;Automatique;19900;France;Marseille;https://..."></textarea>
+ <button class="btn alt" style="margin-top:12px" onclick="importComps()">Importer</button><p id="csvMsg" class="mu" style="font-size:14px"></p>
+ <h4>Annonces enregistrées</h4><label>Rechercher (marque ou modèle)<input id="cp_q" type="search" oninput="clearTimeout(window._cq);window._cq=setTimeout(loadComps,250)"></label>
+ <div class="wrap" style="margin-top:12px"><table><thead><tr><th>Source</th><th>Véhicule</th><th>Année</th><th>Kilométrage</th><th>Prix</th><th>Pays</th><th>Annonce</th><th>Actions</th></tr></thead><tbody id="compRows"></tbody></table></div></div>`;loadUsers();loadComps()}
+const CP=['source','marque','modele','finition','annee','km','carburant','boite','prix','pays','ville','url'];
+async function loadComps(){if(!$('compRows'))return;const r=await api('admin_comp_list',{q:($('cp_q')||{}).value||''});
+ if(r.error){$('compRows').innerHTML=`<tr><td colspan="8">${ERR[r.error]||ERR.srv}</td></tr>`;return}
+ $('compBy').innerHTML=['leboncoin','La Centrale','AutoScout24','Autre'].map(k=>`<div class="stat"><span class="lab">${k}</span><b>${(r.by||{})[k]||0}</b></div>`).join('');
+ $('compRows').innerHTML=r.items.length?r.items.map(x=>`<tr><td>${esc(x.source)}</td><td data-nt style="text-transform:capitalize">${esc(x.marque+' '+x.modele+(x.finition?' '+x.finition:''))}</td><td>${x.annee}</td><td>${(+x.km).toLocaleString(LOCS[L])} km</td><td>${eur(x.prix)}</td><td>${esc(x.pays)}</td><td>${/^https?:\/\//i.test(x.url)?`<a href="${esc(x.url)}" target="_blank" rel="noopener nofollow">Voir</a>`:'—'}</td><td><button class="btn abtn" data-id="${x.id}" onclick="delComp(this)">Supprimer</button></td></tr>`).join(''):'<tr><td colspan="8" class="mu">Aucune annonce enregistrée pour l\'instant.</td></tr>'}
+async function addComp(){const d={};CP.forEach(k=>d[k]=$('cp_'+k).value);const r=await api('admin_comp_add',d);
+ if(r.error){$('cpMsg').textContent=ERR[r.error]||ERR.srv;return}$('cpMsg').textContent='Annonce ajoutée.';['prix','km','url','ville','finition'].forEach(k=>$('cp_'+k).value='');loadComps()}
+async function importComps(){const rows=$('cp_csv').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(l=>l.split(/[;\t]/)).filter(c=>c[0].toLowerCase()!=='source').map(c=>Object.fromEntries(CP.map((k,i)=>[k,(c[i]||'').trim()])));
+ if(!rows.length){$('csvMsg').textContent='Aucune ligne à importer.';return}const r=await api('admin_comp_import',{rows});
+ if(r.error){$('csvMsg').textContent=ERR[r.error]||ERR.srv;return}$('csvMsg').textContent=`Import terminé : ${r.added} annonce(s) ajoutée(s), ${r.skipped} ligne(s) ignorée(s).`;if(r.added)$('cp_csv').value='';loadComps()}
+async function delComp(el){if(!confirm(tt('Supprimer cette annonce ?')))return;await api('admin_comp_del',{id:+el.dataset.id});loadComps()}
 async function loadUsers(){const q=($('adm_q')||{}).value||'';const[st,us]=await Promise.all([api('admin_stats'),api('admin_users',{q})]);
  if(st.error||us.error){$('admBody').innerHTML='<div class="card">Accès refusé.</div>';return}
- const S=st.stats;$('admStats').innerHTML=[['Utilisateurs',S.users],['Actifs',S.users-S.suspended],['Suspendus',S.suspended],['Recherches enregistrées',S.searches],['Nouveaux (7 jours)',S.new7]].map(([l,v])=>`<div class="card"><span class="lab">${l}</span><div class="big">${v}</div></div>`).join('');
+ const S=st.stats;$('admStats').innerHTML=[['Utilisateurs',S.users],['Actifs',S.users-S.suspended],['Suspendus',S.suspended],['Recherches enregistrées',S.searches],['Nouveaux (7 jours)',S.new7],['Annonces comparables',S.comps||0]].map(([l,v])=>`<div class="card"><span class="lab">${l}</span><div class="big">${v}</div></div>`).join('');
  $('admRows').innerHTML=us.users.map(u=>{const me=u.email===U.email,B=(act,v,t,cls)=>`<button class="btn ${cls==null?'alt':cls} abtn" data-id="${esc(u.id)}" data-v="${v}" onclick="adm('${act}',this)">${t}</button>`;
   return`<tr><td><span data-nt>${esc(u.name)}</span>${me?' <span>(vous)</span>':''}</td><td data-nt>${esc(u.email)}</td><td>${u.role==='admin'?'Administrateur':'Utilisateur'}</td><td><span class="st ${u.status==='suspended'?'off':'on'}">${u.status==='suspended'?'Suspendu':'Actif'}</span></td><td>${fd(u.created)}</td><td>${fd(u.last_login)}</td><td>${u.n}</td><td>${me?'—':B('status',u.status==='suspended'?'active':'suspended',u.status==='suspended'?'Réactiver':'Suspendre')+B('pw','','Mot de passe')+B('role',u.role==='admin'?'user':'admin',u.role==='admin'?'Retirer admin':'Passer admin')+B('delete','','Supprimer','')}</td></tr>`}).join('')}
 async function adm(act,el){if(act==='delete'&&!confirm(tt('Supprimer cet utilisateur et tout son historique ?')))return;const r=await api('admin_'+act,{id:el.dataset.id,status:el.dataset.v,role:el.dataset.v});
@@ -932,11 +977,44 @@ Mot de passe>Password|Wachtwoord|Contraseña
 Retirer admin>Remove admin|Admin intrekken|Quitar admin
 Passer admin>Make admin|Admin maken|Hacer admin
 Supprimer cet utilisateur et tout son historique ?>Delete this user and their entire history?|Deze gebruiker en de volledige geschiedenis verwijderen?|¿Eliminar este usuario y todo su historial?
-Mot de passe temporaire, à communiquer à l'utilisateur :>Temporary password, to give to the user:|Tijdelijk wachtwoord, door te geven aan de gebruiker:|Contraseña temporal, para comunicar al usuario:`;
+Mot de passe temporaire, à communiquer à l'utilisateur :>Temporary password, to give to the user:|Tijdelijk wachtwoord, door te geven aan de gebruiker:|Contraseña temporal, para comunicar al usuario:
+Données insuffisantes.>Insufficient data.|Onvoldoende data.|Datos insuficientes.
+Nous n'avons pas trouvé assez d'annonces réelles comparables pour ce véhicule (minimum 3).>We did not find enough real comparable listings for this vehicle (minimum 3).|We hebben niet genoeg echte vergelijkbare advertenties gevonden voor dit voertuig (minimaal 3).|No hemos encontrado suficientes anuncios reales comparables para este vehículo (mínimo 3).
+Aucun prix n'est inventé.>No price is invented.|Er wordt geen prijs verzonnen.|No se inventa ningún precio.
+Données insuffisantes pour comparer les pays : il faut au moins 3 annonces réelles dans au moins deux pays.>Insufficient data to compare countries: at least 3 real listings are needed in at least two countries.|Onvoldoende data om landen te vergelijken: er zijn minstens 3 echte advertenties nodig in minstens twee landen.|Datos insuficientes para comparar países: se necesitan al menos 3 anuncios reales en al menos dos países.
+C'est une analyse basée sur les données disponibles, pas une vérité absolue.>It is an analysis based on the available data, not an absolute truth.|Het is een analyse op basis van de beschikbare data, geen absolute waarheid.|Es un análisis basado en los datos disponibles, no una verdad absoluta.
+Sources des annonces>Listing sources|Bronnen van de advertenties|Fuentes de los anuncios
+Source>Source|Bron|Fuente
+Prix>Price|Prijs|Precio
+Voir>View|Bekijken|Ver
+Autre>Other|Overig|Otro
+Annonces comparables>Comparable listings|Vergelijkbare advertenties|Anuncios comparables
+Base d'annonces comparables>Comparable listings database|Database met vergelijkbare advertenties|Base de anuncios comparables
+Ajoutez ici les annonces réelles relevées sur leboncoin, La Centrale ou AutoScout24. L'estimation utilise uniquement ces annonces : aucun prix n'est inventé.>Add here the real listings collected on leboncoin, La Centrale or AutoScout24. The estimate only uses these listings: no price is invented.|Voeg hier de echte advertenties toe die u op leboncoin, La Centrale of AutoScout24 hebt gevonden. De schatting gebruikt alleen deze advertenties: er wordt geen prijs verzonnen.|Añada aquí los anuncios reales recogidos en leboncoin, La Centrale o AutoScout24. La estimación solo utiliza estos anuncios: no se inventa ningún precio.
+Ajouter une annonce>Add a listing|Advertentie toevoegen|Añadir un anuncio
+Prix (€)>Price (€)|Prijs (€)|Precio (€)
+Ville>City|Stad|Ciudad
+Lien de l'annonce>Listing link|Link naar de advertentie|Enlace del anuncio
+Ajouter l'annonce>Add the listing|Advertentie toevoegen|Añadir el anuncio
+Importer un tableau (Excel / CSV)>Import a table (Excel / CSV)|Tabel importeren (Excel / CSV)|Importar una tabla (Excel / CSV)
+Une annonce par ligne, colonnes séparées par des points-virgules, dans cet ordre :>One listing per line, columns separated by semicolons, in this order:|Eén advertentie per regel, kolommen gescheiden door puntkomma's, in deze volgorde:|Un anuncio por línea, columnas separadas por punto y coma, en este orden:
+Importer>Import|Importeren|Importar
+Annonces enregistrées>Saved listings|Opgeslagen advertenties|Anuncios guardados
+Rechercher (marque ou modèle)>Search (make or model)|Zoeken (merk of model)|Buscar (marca o modelo)
+Aucune annonce enregistrée pour l'instant.>No listing saved yet.|Nog geen advertenties opgeslagen.|Aún no hay anuncios guardados.
+Annonce ajoutée.>Listing added.|Advertentie toegevoegd.|Anuncio añadido.
+Aucune ligne à importer.>No line to import.|Geen regels om te importeren.|No hay líneas para importar.
+Supprimer cette annonce ?>Delete this listing?|Deze advertentie verwijderen?|¿Eliminar este anuncio?
+Annonce refusée : vérifiez la source, la marque, le modèle, l'année, le kilométrage et le prix.>Listing rejected: check the source, make, model, year, mileage and price.|Advertentie geweigerd: controleer bron, merk, model, jaar, kilometerstand en prijs.|Anuncio rechazado: compruebe la fuente, la marca, el modelo, el año, el kilometraje y el precio.
+Cette fonction nécessite le serveur (api.php sur Hostinger).>This feature requires the server (api.php on Hostinger).|Deze functie vereist de server (api.php op Hostinger).|Esta función requiere el servidor (api.php en Hostinger).`;
 const D={};RAW.split('\n').forEach(l=>{const i=l.indexOf('>');D[l.slice(0,i).trim()]=l.slice(i+1).split('|')});
 const LI={en:0,nl:1,es:2};
 /* Phrases dynamiques (avec des nombres) : motif français -> traductions ($1, $2… = parties variables) */
-const PT=[[/^(\d+) véhicules comparables analysés$/,['$1 comparable vehicles analysed','$1 vergelijkbare voertuigen geanalyseerd','$1 vehículos comparables analizados']],
+const PT=[[/^Annonces comparables trouvées : (\d+)$/,['Comparable listings found: $1','Gevonden vergelijkbare advertenties: $1','Anuncios comparables encontrados: $1']],
+[/^Import terminé : (\d+) annonce\(s\) ajoutée\(s\), (\d+) ligne\(s\) ignorée\(s\)\.$/,['Import finished: $1 listing(s) added, $2 line(s) skipped.','Import voltooid: $1 advertentie(s) toegevoegd, $2 regel(s) overgeslagen.','Importación terminada: $1 anuncio(s) añadido(s), $2 línea(s) ignorada(s).']],
+[/^Cette estimation est la médiane des prix de (\d+) annonces réelles comparables : même marque et même modèle, kilométrage proche, même carburant, année ±1 an et même boîte\.$/,['This estimate is the median price of $1 real comparable listings: same make and model, similar mileage, same fuel, year ±1 and same gearbox.','Deze schatting is de mediaanprijs van $1 echte vergelijkbare advertenties: zelfde merk en model, vergelijkbare kilometerstand, zelfde brandstof, bouwjaar ±1 jaar en zelfde versnellingsbak.','Esta estimación es la mediana de los precios de $1 anuncios reales comparables: misma marca y modelo, kilometraje similar, mismo combustible, año ±1 y misma caja de cambios.']],
+[/^Cette estimation est la médiane des prix de (\d+) annonces réelles comparables : même marque et même modèle, kilométrage proche, même carburant, année ±2 ans \(boîte non filtrée, faute d'annonces suffisantes\)\.$/,['This estimate is the median price of $1 real comparable listings: same make and model, similar mileage, same fuel, year ±2 (gearbox not filtered, for lack of enough listings).','Deze schatting is de mediaanprijs van $1 echte vergelijkbare advertenties: zelfde merk en model, vergelijkbare kilometerstand, zelfde brandstof, bouwjaar ±2 jaar (versnellingsbak niet gefilterd, wegens te weinig advertenties).','Esta estimación es la mediana de los precios de $1 anuncios reales comparables: misma marca y modelo, kilometraje similar, mismo combustible, año ±2 (caja de cambios sin filtrar, por falta de anuncios suficientes).']],
+[/^(\d+) véhicules comparables analysés$/,['$1 comparable vehicles analysed','$1 vergelijkbare voertuigen geanalyseerd','$1 vehículos comparables analizados']],
 [/^Le prix demandé est (inférieur|supérieur) d'environ (.+?) % au prix médian observé\. Le Deal Rating mesure uniquement le prix, pas la qualité du véhicule\.$/,['The asking price is about $2 % $1 than the observed median price. Deal Rating measures price only, not vehicle quality.','De vraagprijs ligt ongeveer $2 % $1 dan de waargenomen mediaanprijs. De Deal Rating meet alleen de prijs, niet de kwaliteit.','El precio pedido es aproximadamente un $2 % $1 al precio mediano observado. El Deal Rating solo mide el precio, no la calidad del vehículo.']],
 [/^Le prix demandé est (inférieur|supérieur) d'environ (.+?) % au prix médian observé \((.+?) vs (.+?)\)\.$/,['The asking price is about $2 % $1 than the observed median price ($3 vs $4).','De vraagprijs ligt ongeveer $2 % $1 dan de waargenomen mediaanprijs ($3 vs $4).','El precio pedido es aproximadamente un $2 % $1 al precio mediano observado ($3 frente a $4).']],
 [/^Meilleure opportunité nette : (.+?) — véhicule (.+?) \+ transport estimé (.+?) = (.+?)\. Par rapport à (.+?) \((.+?)\), marge possible : (.+?) \((.+?) %\)\.$/,['Best net opportunity: $1 — vehicle $2 + estimated transport $3 = $4. Compared with $5 ($6), possible margin: $7 ($8 %).','Beste netto kans: $1 — voertuig $2 + geschat transport $3 = $4. Ten opzichte van $5 ($6) is de mogelijke marge $7 ($8 %).','Mejor oportunidad neta: $1 — vehículo $2 + transporte estimado $3 = $4. Frente a $5 ($6), margen posible: $7 ($8 %).']],

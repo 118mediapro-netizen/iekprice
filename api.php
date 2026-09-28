@@ -24,6 +24,9 @@ try {
   $cols = array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC), 'name');
   foreach (['role' => "TEXT DEFAULT 'user'", 'status' => "TEXT DEFAULT 'active'", 'last_login' => 'TEXT'] as $c => $def)
     if (!in_array($c, $cols)) $db->exec("ALTER TABLE users ADD COLUMN $c $def");
+  // Base d'annonces comparables (relevées sur leboncoin, La Centrale, AutoScout24…)
+  $db->exec('CREATE TABLE IF NOT EXISTS comparables(id INTEGER PRIMARY KEY, source TEXT, marque TEXT, modele TEXT, finition TEXT, annee INTEGER, km INTEGER, carburant TEXT, boite TEXT, prix INTEGER, pays TEXT, ville TEXT, url TEXT, added_by INTEGER, at TEXT)');
+  $db->exec('CREATE INDEX IF NOT EXISTS c_mm ON comparables(marque, modele)');
 
   $a = $_GET['a'] ?? '';
   $d = json_decode(file_get_contents('php://input'), true) ?: [];
@@ -31,6 +34,12 @@ try {
   $user = function ($id) use ($q) { $r = $q('SELECT name,email,role,status FROM users WHERE id=?', [$id])->fetch(PDO::FETCH_ASSOC); return $r ?: null; };
   $promote = function ($id, $email) use ($q, $ADMIN_EMAILS) {
     if (in_array($email, array_map('strtolower', $ADMIN_EMAILS), true)) $q("UPDATE users SET role='admin' WHERE id=?", [$id]);
+  };
+  // Texte normalisé pour comparer les annonces : minuscules, sans accents, espaces simples
+  $norm = function ($x) {
+    $x = mb_strtolower(trim((string)$x));
+    $x = strtr($x, ['à'=>'a','â'=>'a','ä'=>'a','á'=>'a','ç'=>'c','é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','í'=>'i','î'=>'i','ï'=>'i','ñ'=>'n','ó'=>'o','ô'=>'o','ö'=>'o','ú'=>'u','ù'=>'u','û'=>'u','ü'=>'u']);
+    return preg_replace('/\s+/', ' ', $x);
   };
   $pub = function ($u) { return $u ? ['name' => $u['name'], 'email' => $u['email'], 'role' => $u['role'] ?: 'user'] : null; };
 
@@ -65,6 +74,28 @@ try {
   }
   if ($a === 'logout') { $_SESSION = []; session_destroy(); out(['ok' => 1]); }
   if ($a === 'me') out(['user' => $pub($me)]);
+
+  // ---- Estimation : annonces comparables (public, sans compte) ----
+  if ($a === 'comps') {
+    $n = $norm;
+    $marque = $n($d['marque'] ?? ''); $modele = $n($d['modele'] ?? '');
+    $annee = (int)($d['annee'] ?? 0); $km = (int)($d['km'] ?? 0);
+    $carb = $n($d['carburant'] ?? ''); $bv = $n($d['boite'] ?? '');
+    if ($marque === '' || $modele === '' || $annee < 1950) out(['items' => []]);
+    $win = max(30000, (int)round($km * 0.35));
+    $find = function ($dy, $withBv) use ($q, $marque, $modele, $annee, $km, $win, $carb, $bv) {
+      $sql = "SELECT source,annee,km,prix,pays,ville,url,at FROM comparables WHERE marque=? AND (modele LIKE '%'||?||'%' OR ? LIKE '%'||modele||'%') AND annee BETWEEN ? AND ? AND ABS(km-?)<=?";
+      $p = [$marque, $modele, $modele, $annee - $dy, $annee + $dy, $km, $win];
+      if ($carb !== '') { $sql .= ' AND carburant=?'; $p[] = $carb; }
+      if ($withBv && $bv !== '') { $sql .= ' AND boite=?'; $p[] = $bv; }
+      return $q($sql . ' ORDER BY prix LIMIT 500', $p)->fetchAll(PDO::FETCH_ASSOC);
+    };
+    $rows = $find(1, true); $relaxed = false;
+    if (count($rows) < 5) { $rows = $find(2, false); $relaxed = true; }
+    // Source automatique future (API d'un fournisseur de données) : à ajouter ici, côté serveur uniquement.
+    foreach ($rows as &$r) { $r['annee'] = (int)$r['annee']; $r['km'] = (int)$r['km']; $r['prix'] = (int)$r['prix']; }
+    out(['items' => $rows, 'relaxed' => $relaxed]);
+  }
   if (!$uid) out(['error' => 'e_auth'], 401);
 
   // ---- Administration (réservée aux comptes admin) ----
@@ -77,6 +108,7 @@ try {
         'suspended' => $one("SELECT COUNT(*) FROM users WHERE status='suspended'"),
         'searches' => $one('SELECT COUNT(*) FROM history'),
         'new7' => $one('SELECT COUNT(*) FROM users WHERE created>=?', [gmdate('c', time() - 7 * 86400)]),
+        'comps' => $one('SELECT COUNT(*) FROM comparables'),
       ]]);
     }
     if ($a === 'admin_users') {
@@ -85,6 +117,41 @@ try {
       foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['n'] = (int)$r['n']; }
       out(['users' => $rows]);
     }
+    // ---- Base de comparables (ajout manuel, import CSV, liste, suppression) ----
+    $clean = function ($r) use ($norm) {
+      $n = function ($x) use ($norm) { return mb_substr($norm($x), 0, 80); };
+      $src = $n($r['source'] ?? '');
+      $srcs = ['leboncoin' => 'leboncoin', 'la centrale' => 'La Centrale', 'lacentrale' => 'La Centrale', 'autoscout24' => 'AutoScout24', 'autoscout' => 'AutoScout24', 'autre' => 'Autre'];
+      $num = function ($x) { return (int)preg_replace('/\D/', '', (string)$x); };
+      $row = ['source' => $srcs[$src] ?? null, 'marque' => $n($r['marque'] ?? ''), 'modele' => $n($r['modele'] ?? ''), 'finition' => $n($r['finition'] ?? ''),
+        'annee' => $num($r['annee'] ?? 0), 'km' => $num($r['km'] ?? 0), 'carburant' => $n($r['carburant'] ?? ''), 'boite' => $n($r['boite'] ?? ''),
+        'prix' => $num($r['prix'] ?? 0), 'pays' => mb_substr(trim((string)($r['pays'] ?? '')), 0, 40) ?: 'France', 'ville' => mb_substr(trim((string)($r['ville'] ?? '')), 0, 60),
+        'url' => trim((string)($r['url'] ?? ''))];
+      if ($row['url'] !== '' && !preg_match('#^https?://#i', $row['url'])) $row['url'] = '';
+      $row['url'] = mb_substr($row['url'], 0, 500);
+      $ok = $row['source'] && $row['marque'] !== '' && $row['modele'] !== '' && $row['annee'] >= 1950 && $row['annee'] <= (int)gmdate('Y') + 1
+        && $row['km'] >= 0 && $row['km'] <= 1500000 && $row['prix'] >= 300 && $row['prix'] <= 2000000;
+      return $ok ? $row : null;
+    };
+    $ins = function ($row) use ($q, $uid) {
+      $q('INSERT INTO comparables(source,marque,modele,finition,annee,km,carburant,boite,prix,pays,ville,url,added_by,at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [$row['source'], $row['marque'], $row['modele'], $row['finition'], $row['annee'], $row['km'], $row['carburant'], $row['boite'], $row['prix'], $row['pays'], $row['ville'], $row['url'], $uid, gmdate('c')]);
+    };
+    if ($a === 'admin_comp_add') { $row = $clean($d); if (!$row) out(['error' => 'e_comp']); $ins($row); out(['ok' => 1]); }
+    if ($a === 'admin_comp_import') {
+      $list = is_array($d['rows'] ?? null) ? array_slice($d['rows'], 0, 2000) : [];
+      $added = 0; $db->beginTransaction();
+      foreach ($list as $r) { $row = is_array($r) ? $clean($r) : null; if ($row) { $ins($row); $added++; } }
+      $db->commit();
+      out(['added' => $added, 'skipped' => count($list) - $added]);
+    }
+    if ($a === 'admin_comp_list') {
+      $l = '%' . mb_strtolower(trim($d['q'] ?? '')) . '%';
+      $rows = $q("SELECT id,source,marque,modele,finition,annee,km,carburant,boite,prix,pays,ville,url,at FROM comparables WHERE marque||' '||modele LIKE ? ORDER BY id DESC LIMIT 300", [$l])->fetchAll(PDO::FETCH_ASSOC);
+      $by = $q('SELECT source, COUNT(*) AS n FROM comparables GROUP BY source')->fetchAll(PDO::FETCH_KEY_PAIR);
+      out(['items' => $rows, 'by' => $by]);
+    }
+    if ($a === 'admin_comp_del') { $q('DELETE FROM comparables WHERE id=?', [(int)($d['id'] ?? 0)]); out(['ok' => 1]); }
     $t = (int)($d['id'] ?? 0);
     if (!$user($t)) out(['error' => 'srv']);
     if ($t === (int)$uid) out(['error' => 'e_self']);
