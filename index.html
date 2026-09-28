@@ -331,7 +331,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 <a class="logo" href="#" onclick="go('home');return false" aria-label="IEPRICE"><img class="lg" alt="IEPRICE" width="105" height="24"></a>
 <nav id="nav" aria-label="Menu"></nav>
 <div class="hr">
-<select id="lang" onchange="setLang(this.value)" aria-label="Langue / Language"><option value="fr">FR</option><option value="en">EN</option><option value="nl">NL</option><option value="es">ES</option></select>
+<select id="lang" onchange="setLang(this.value)" aria-label="Langue / Language"><option value="fr">FR</option><option value="en">EN</option><option value="es">ES</option><option value="nl">NL</option></select>
 <button id="themeBtn" class="icb" onclick="toggleTheme()" aria-label="Thème clair / sombre" title="Clair / Sombre"></button>
 <button class="icb" id="hLogin" onclick="openAuth('login')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span>Se connecter</span></button>
 <button class="btn dark" id="hReg" onclick="openAuth('register')">Créer mon compte</button>
@@ -398,7 +398,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 <div class="two"><div><h3>L'estimateur</h3><p class="mu">« Je veux savoir ce que vaut mon véhicule. »</p><p>Vous donnez marque, modèle, année et kilométrage. Vous recevez le prix de marché, la fourchette et le prix conseillé.</p><button class="btn" onclick="go('pricing')">Estimer</button></div>
 <div><h3>L'analyse d'annonce</h3><p class="mu">« Cette annonce est-elle bien positionnée ? »</p><p>Vous collez l'annonce. Vous recevez le Deal Rating, les points à vérifier et les questions à poser.</p><button class="btn" onclick="go('analyse')">Analyser</button></div></div></div>
 
-<div class="sec faq"><div class="eyebrow">FAQ</div><h2 class="t">Questions fréquentes.</h2>
+<div class="sec faq"><div class="eyebrow">Aide</div><h2 class="t">Questions fréquentes.</h2>
 <details><summary>Le Deal Rating garantit-il une bonne affaire ?</summary><p>Non. Il mesure uniquement le prix par rapport aux comparables, pas l'état, la fiabilité ou l'historique du véhicule.</p></details>
 <details><summary>D'où viennent les données ?</summary><p>Des grandes plateformes d'annonces (AutoScout24, leboncoin, La Centrale, Le Parking), connectées progressivement. Pour un pays ou un modèle sans données fiables, aucun prix n'est inventé.</p></details>
 <details><summary>L'estimation est-elle une certitude ?</summary><p>Non, c'est une analyse basée sur les données disponibles, avec un niveau de confiance affiché.</p></details>
@@ -408,7 +408,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 </section>
 
 <section id="pricing" class="view">
-<div class="ph"><div class="eyebrow">Pricing</div><h1>Estimer un véhicule</h1></div>
+<div class="ph"><div class="eyebrow">Prix de marché</div><h1>Estimer un véhicule</h1></div>
 <div class="card"><div class="fgrid4">
 <label>Marque<input id="f_marque" value="BMW"></label>
 <label>Modèle<input id="f_modele" value="Série 3 320d"></label>
@@ -425,7 +425,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 </section>
 
 <section id="analyse" class="view">
-<div class="ph"><div class="eyebrow">Deal Rating</div><h1>Analyser une annonce</h1></div>
+<div class="ph"><div class="eyebrow">Note de l'annonce</div><h1>Analyser une annonce</h1></div>
 <div class="card">
 <label>Lien de l'annonce (récupération automatique bientôt disponible)<input id="a_url" placeholder="https://..."></label>
 <div class="fgrid4" style="margin-top:18px"><label>Prix demandé (€)<input id="a_prix" type="number" inputmode="numeric" value="19900"></label>
@@ -436,7 +436,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 </section>
 
 <section id="world" class="view">
-<div class="ph"><div class="eyebrow">World</div><h1>WORLD — Marché européen</h1>
+<div class="ph"><div class="eyebrow">Europe</div><h1>WORLD — Marché européen</h1>
 <p class="mu">Comparez le prix d'un même véhicule dans plusieurs pays. Aucune donnée n'est inventée : un pays sans source fiable affiche « Données insuffisantes pour ce marché. »</p></div>
 <div class="card wrap"><table><thead><tr><th>Pays</th><th>Prix médian</th><th>Annonces</th><th>Écart avec la France</th><th>Statut</th></tr></thead><tbody id="wt"></tbody></table></div>
 <div class="mapph" id="worldMap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><b>Carte interactive</b><div class="note">La carte interactive et les données par pays seront activées lorsqu'une source (AutoScout24 ou autre plateforme) sera connectée.</div></div>
@@ -444,7 +444,7 @@ footer .copy{grid-column:1/-1;border-top:1px solid var(--ln);padding-top:20px;fo
 
 <section id="dash" class="view"><div class="ph"><div class="eyebrow">Compte</div><h1>Tableau de bord</h1></div><div id="dashBody"></div></section>
 
-<section id="admin" class="view"><div class="ph"><div class="eyebrow">Admin</div><h1>Administration</h1></div><div id="admBody"></div></section>
+<section id="admin" class="view"><div class="ph"><div class="eyebrow">Réservé aux administrateurs</div><h1>Administration</h1></div><div id="admBody"></div></section>
 </main>
 <footer><div class="fin"><div><a class="logo" href="#" onclick="go('home');return false" aria-label="IEPRICE"><img class="lg" alt="IEPRICE" width="105" height="24"></a><p class="mu">Une plateforme intelligente d'analyse du marché automobile d'occasion.</p></div><div><b>Produit</b><a href="#" onclick="go('pricing');return false">Pricing</a><a href="#" onclick="go('analyse');return false">Analyser une annonce</a><a href="#" onclick="go('world');return false">World</a></div><div><b>Compte</b><a href="#" onclick="go('dash');return false">Tableau de bord</a></div><div class="copy">© <span id="yr" data-nt></span> IEPRICE</div></div></footer>
 <div id="auth" class="modal" onclick="if(event.target===this)closeAuth()" role="dialog" aria-modal="true" aria-labelledby="authT"><div class="card mbox">
@@ -467,7 +467,7 @@ const ICO={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-
 const TABS=[['home','Accueil'],['pricing','Pricing'],['analyse','Analyser une annonce'],['world','World'],['dash','Tableau de bord']];
 $('nav').innerHTML=TABS.map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')">${t[1]}</button>`).join('');
 $('tabbar').innerHTML=[['home','Accueil'],['pricing','Pricing'],['analyse','Annonce'],['world','World'],['dash','Compte']].map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')"><svg viewBox="0 0 24 24" aria-hidden="true">${ICO[t[0]]}</svg><span>${t[1]}</span></button>`).join('');
-$('nav').insertAdjacentHTML('beforeend','<button data-t="admin" id="navAdmin" style="display:none" onclick="go(\'admin\')">Admin</button>');
+$('nav').insertAdjacentHTML('beforeend','<button data-t="admin" id="navAdmin" style="display:none" onclick="go(\'admin\')">Administration</button>');
 function go(id){if(id==='admin'&&!(U&&U.role==='admin')){go('home');return}document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===id));document.querySelectorAll('[data-t]').forEach(b=>{b.classList.toggle('on',b.dataset.t===id);if(b.dataset.t===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});if(id==='dash')renderDash();if(id==='admin')renderAdmin();scrollTo(0,0)}
 go('home');$('exg').innerHTML=gauge(18000,24000,null,[[21300,'Médiane'],[19900,'Prix demandé']]);$('yr').textContent=new Date().getFullYear();
 
@@ -501,7 +501,7 @@ function buildFicheEstimate(x){const r=x.euResult;return ficheHead(`<span data-n
   `+ficheFoot()}
 function buildFicheAnalysis(x){return ficheHead('Analyse d\'annonce')+`
   ${x.r?`<div class="fbadge">DEAL RATING ${x.r.g}</div><p style="margin:10px 0">Le prix demandé est ${x.r.d<0?'inférieur':'supérieur'} d'environ ${pctf(x.r.d)} % au prix médian observé (${eur(x.px)} vs ${eur(x.md)}).</p>`:''}
-  <h3 class="fh3">IEPRICE Assistant</h3>
+  <h3 class="fh3">Assistant IEPRICE</h3>
   ${x.hits.length?x.hits.map(h=>`<p class="pt" style="margin:6px 0"><span>${h[1]}</span><span>${h[2]}</span></p>`).join(''):'<p class="mu">L\'annonce ne précise pas d\'éléments analysables.</p>'}
   <p style="margin-top:14px"><b>Notre analyse.</b> <span>${x.verdict}</span></p>
   `+ficheFoot()}
@@ -577,7 +577,7 @@ function analyse(){
   const hits=RULES.filter(r=>r[0].test(t));
   const verdict=hits.filter(r=>r[1]==='🔴').length?'Des points de vigilance sont mentionnés : vérifiez-les avant de poursuivre.':'L\'annonce contient des informations utiles, mais elles restent déclaratives.';
   const miss=[['distribution','distribution'],['contr','contrôle technique'],['propri','propriétaires']].filter(k=>!new RegExp(k[0],'i').test(t));
-  h+=`<div class="card" style="margin-top:16px"><div class="eyebrow">Assistant</div><h3>IEPRICE Assistant</h3>`+(hits.length?hits.map(r=>`<div class="pt"><span>${r[1]}</span><div><span>${r[2]}</span><br><span class="mu">${r[3]}</span></div></div>`).join(''):'<p class="mu">L\'annonce ne précise pas d\'éléments analysables.</p>')+`
+  h+=`<div class="card" style="margin-top:16px"><div class="eyebrow">Assistant</div><h3>Assistant IEPRICE</h3>`+(hits.length?hits.map(r=>`<div class="pt"><span>${r[1]}</span><div><span>${r[2]}</span><br><span class="mu">${r[3]}</span></div></div>`).join(''):'<p class="mu">L\'annonce ne précise pas d\'éléments analysables.</p>')+`
   <h4>Questions à poser au vendeur</h4><ul>${hits.map(r=>`<li>${r[3]}</li>`).join('')}<li>Le véhicule a-t-il déjà été accidenté ?</li></ul>
   <h4>Documents à demander</h4><p class="mu">Carnet d'entretien, factures, contrôle technique, historique du véhicule.</p>
   ${miss.length?'<p class="mu"><span>L\'annonce ne précise pas :</span> '+miss.map(k=>`<span>${k[1]}</span>`).join(', ')+'.</p>':''}
@@ -803,7 +803,12 @@ Prix médian des comparables (€) — optionnel>Median price of comparables (�
 Texte de l'annonce (titre + description)>Listing text (title + description)|Advertentietekst (titel + beschrijving)|Texto del anuncio (título + descripción)
 Prix exceptionnellement bas — vérifiez attentivement les caractéristiques, l'historique et l'état du véhicule.>Exceptionally low price — carefully check the vehicle's specifications, history and condition.|Uitzonderlijk lage prijs — controleer zorgvuldig de kenmerken, de historiek en de staat van het voertuig.|Precio excepcionalmente bajo — compruebe con atención las características, el historial y el estado del vehículo.
 Assistant>Assistant|Assistent|Asistente
-IEPRICE Assistant>IEPRICE Assistant|IEPRICE Assistent|Asistente IEPRICE
+Assistant IEPRICE>IEPRICE Assistant|IEPRICE-assistent|Asistente IEPRICE
+Prix de marché>Market price|Marktprijs|Precio de mercado
+Note de l'annonce>Listing rating|Advertentiescore|Nota del anuncio
+Europe>Europe|Europa|Europa
+Réservé aux administrateurs>Administrators only|Alleen voor beheerders|Solo para administradores
+Aide>Help|Hulp|Ayuda
 Le vendeur affirme que l'entretien est documenté.>The seller claims the servicing is documented.|De verkoper beweert dat het onderhoud gedocumenteerd is.|El vendedor afirma que el mantenimiento está documentado.
 Nous vous recommandons de demander les factures.>We recommend asking for the invoices.|Wij raden u aan de facturen op te vragen.|Le recomendamos pedir las facturas.
 L'annonce évoque la distribution.>The listing mentions the timing belt.|De advertentie vermeldt de distributie.|El anuncio menciona la distribución.
